@@ -18,6 +18,9 @@ def watershed(img):
 
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
+    # thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+
     kernel = np.ones((3, 3), np.uint8)
     sure_fg = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     sure_fg = np.uint8(sure_fg)
@@ -37,7 +40,8 @@ def watershed(img):
 
     contours[contours != -1] = 0
     contours[contours == -1] = 255
-    contours = cv2.dilate(contours.astype(np.uint8), kernel, iterations=1)
+    contours = contours.astype(np.uint8)
+    #contours = cv2.dilate(contours, kernel, iterations=1)
     return contours
 
 
@@ -131,12 +135,14 @@ while True:
         else:
             area_mm2=0
 
+        '''
         cv2.putText(image, "{:.1f}mm".format(mm_width),
                     (int((tl[0]+tr[0])/2-20), int((tl[1]+tr[1])/2 - 20)), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (255, 255, 255), 2)
         cv2.putText(image, "{:.1f}mm".format(mm_height),
                     (int((tl[0]+bl[0])/2-20), int((tl[1]+bl[1])/2-20)), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (255, 255, 255), 2)
+        '''
         cv2.putText(image, "{:.1f}mm^2".format(area_mm2),
                     (int((tl[0] + bl[0] + tr[0] + br[0]) / 4), int((tl[1] + bl[1] + tr[1] + br[1])/4)), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
