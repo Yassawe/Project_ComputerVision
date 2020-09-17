@@ -8,11 +8,16 @@ img_path = "images/ex2.jpg"
 a4_w = 210
 a4_h = 297
 
+webcam=True
+crop=True
+cap = cv2.VideoCapture(0)
+
 def watershed(img):
     grayscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(grayscale, (3, 3), cv2.BORDER_DEFAULT)
+    blur = cv2.GaussianBlur(grayscale, (9, 9), cv2.BORDER_DEFAULT)
 
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
     kernel = np.ones((3, 3), np.uint8)
     sure_fg = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     sure_fg = np.uint8(sure_fg)
@@ -38,21 +43,17 @@ def watershed(img):
 
 def get_cnts(image):
     edged=watershed(image)
-    cnts, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, _ = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     areas=[]
-    for c in cnts:
-        areas.append(cv2.contourArea(c))
+    if cnts:
+        for c in cnts:
+            areas.append(cv2.contourArea(c))
+        max_index = areas.index(max(areas))
+        return cnts, areas, max_index
+    else:
+        return cnts, areas, 0
 
-    max_index = areas.index(max(areas))
-
-    return cnts, areas, max_index
-
-def crop_a4(image, A=210, B=297, scale=3, padding=20):
-
-    cnts, _, max_index = get_cnts(image)
-    box = cv2.minAreaRect(cnts[max_index])
-    box = np.array(cv2.boxPoints(box), dtype="int")
-    box = perspective.order_points(box)
+def crop_a4(image, box, A=210, B=297, scale=3, padding=50):
 
     (tl, tr, br, bl)=box
     box=[tl,tr,bl,br]
@@ -74,12 +75,29 @@ def crop_a4(image, A=210, B=297, scale=3, padding=20):
 
 while True:
     #TODO: стримить сюда фрейм за фреймом с FPGA
-    image = cv2.imread(img_path)
-    image = crop_a4(image, a4_w, a4_h)
+    if webcam:
+        _, image = cap.read()
+    else:
+        image = cv2.imread(img_path)
 
-    longest_side= max(image.shape)
+    cnts, _, max_index = get_cnts(image)
+    box = cv2.minAreaRect(cnts[max_index])
+    box = np.array(cv2.boxPoints(box), dtype="int")
+    box = perspective.order_points(box)
+
+    if crop:
+        image = crop_a4(image, box, a4_w, a4_h)
+        longest_side = max(image.shape)
+
+    else:
+        (tl, tr, br, bl) = box
+        w = dist.euclidean((tl[0], tl[1]), (tr[0], tr[1]))
+        h = dist.euclidean((tl[0], tl[1]), (bl[0], bl[1]))
+        longest_side = max([w, h])
+        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
     pixel_per_mm=longest_side/a4_h
-
     cnts, areas, _ = get_cnts(image)
 
     for i in range(len(cnts)):
@@ -107,7 +125,11 @@ while True:
 
         box_area_px = cv2.contourArea(box)
         contour_area_px = areas[i]
-        area_mm2=(contour_area_px/box_area_px)*(mm_height*mm_width)
+
+        if box_area_px !=0 :
+            area_mm2=(contour_area_px/box_area_px)*(mm_height*mm_width)
+        else:
+            area_mm2=0
 
         cv2.putText(image, "{:.1f}mm".format(mm_width),
                     (int((tl[0]+tr[0])/2-20), int((tl[1]+tr[1])/2 - 20)), cv2.FONT_HERSHEY_SIMPLEX,
@@ -120,4 +142,4 @@ while True:
                     0.5, (0, 255, 0), 2)
 
     cv2.imshow("image1", image)
-    cv2.waitKey(0)
+    cv2.waitKey(1)
