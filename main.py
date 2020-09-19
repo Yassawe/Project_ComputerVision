@@ -1,6 +1,7 @@
 from scipy.spatial import distance as dist
 from imutils import perspective
 import numpy as np
+from CNN import model
 import cv2
 
 img_path = "images/ex2.jpg"
@@ -9,18 +10,13 @@ a4_w = 210
 a4_h = 297
 
 webcam=True
-crop=True
+crop=False
 cap = cv2.VideoCapture(0)
 
 def watershed(img):
     grayscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(grayscale, (9, 9), cv2.BORDER_DEFAULT)
-
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    # thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-
-
     kernel = np.ones((3, 3), np.uint8)
     sure_fg = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
     sure_fg = np.uint8(sure_fg)
@@ -41,7 +37,7 @@ def watershed(img):
     contours[contours != -1] = 0
     contours[contours == -1] = 255
     contours = contours.astype(np.uint8)
-    #contours = cv2.dilate(contours, kernel, iterations=1)
+    #contours = cv2.dilate(contours, kernel, iterations=1) (хз оставить или нет)
     return contours
 
 
@@ -56,6 +52,22 @@ def get_cnts(image):
         return cnts, areas, max_index
     else:
         return cnts, areas, 0
+
+
+def identify(img):
+    img = cv2.resize(img, (200, 200))
+    convlayers = [16, 32, 64, 64, 64]
+    fc_layers = [512, 1]
+    kernel = [(3, 3), (3, 3), (3, 3), (3, 3), (3, 3)]
+    m_f = 2
+    m_s = 2
+    activation_hidden = 'relu'
+    activation_last = 'sigmoid'
+    lr = 0.01
+    CNN_model = model(lr, convlayers, fc_layers, kernel, m_f, m_s, activation_hidden, activation_last)
+    CNN_model.upload_weights('weights_stone.h5')
+    return CNN_model.predict(img)
+
 
 def crop_a4(image, box, A=210, B=297, scale=3, padding=50):
 
@@ -78,7 +90,7 @@ def crop_a4(image, box, A=210, B=297, scale=3, padding=50):
     return cropped
 
 while True:
-    #TODO: стримить сюда фрейм за фреймом с FPGA
+    #TODO: стримить сюда фрейм за фреймом с FPGA (или похуй с вебки покажем)
     if webcam:
         _, image = cap.read()
     else:
@@ -98,7 +110,6 @@ while True:
         w = dist.euclidean((tl[0], tl[1]), (tr[0], tr[1]))
         h = dist.euclidean((tl[0], tl[1]), (bl[0], bl[1]))
         longest_side = max([w, h])
-        #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
     pixel_per_mm=longest_side/a4_h
@@ -107,14 +118,11 @@ while True:
     for i in range(len(cnts)):
         if cv2.contourArea(cnts[i]) < 100:
             continue
-        cv2.drawContours(image, cnts[i], -1, (0, 255, 0), 3)
 
         box = cv2.minAreaRect(cnts[i])
         box = cv2.boxPoints(box)
         box = np.array(box, dtype="int")
         box = perspective.order_points(box)
-
-        cv2.drawContours(image, [box.astype("int")], -1, (0, 0, 255), 2)
 
         for (x, y) in box:
             cv2.circle(image, (int(x), int(y)), 5, (255, 0, 0), -1)
@@ -135,17 +143,16 @@ while True:
         else:
             area_mm2=0
 
-        '''
-        cv2.putText(image, "{:.1f}mm".format(mm_width),
-                    (int((tl[0]+tr[0])/2-20), int((tl[1]+tr[1])/2 - 20)), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), 2)
-        cv2.putText(image, "{:.1f}mm".format(mm_height),
-                    (int((tl[0]+bl[0])/2-20), int((tl[1]+bl[1])/2-20)), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), 2)
-        '''
-        cv2.putText(image, "{:.1f}mm^2".format(area_mm2),
-                    (int((tl[0] + bl[0] + tr[0] + br[0]) / 4), int((tl[1] + bl[1] + tr[1] + br[1])/4)), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 2)
+
+        #TODO: crop bounding box aroung the image
+        # image = crop_somehow(image)
+
+        if identify(image):
+            cv2.drawContours(image, cnts[i], -1, (0, 255, 0), 3)
+            cv2.drawContours(image, [box.astype("int")], -1, (0, 0, 255), 2)
+            cv2.putText(image, "{:.1f}mm^2".format(area_mm2),
+                        (int((tl[0] + bl[0] + tr[0] + br[0]) / 4), int((tl[1] + bl[1] + tr[1] + br[1])/4)), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (0, 255, 0), 2)
 
     cv2.imshow("image1", image)
     cv2.waitKey(1)
