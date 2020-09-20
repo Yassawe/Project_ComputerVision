@@ -15,7 +15,7 @@ cap = cv2.VideoCapture(0)
 
 def watershed(img):
     grayscale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(grayscale, (9, 9), cv2.BORDER_DEFAULT)
+    blur = cv2.GaussianBlur(grayscale, (5, 5), cv2.BORDER_DEFAULT)
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     kernel = np.ones((3, 3), np.uint8)
     sure_fg = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
@@ -37,7 +37,7 @@ def watershed(img):
     contours[contours != -1] = 0
     contours[contours == -1] = 255
     contours = contours.astype(np.uint8)
-    #contours = cv2.dilate(contours, kernel, iterations=1) (хз оставить или нет)
+    #contours = cv2.dilate(contours, kernel, iterations=1)
     return contours
 
 
@@ -52,7 +52,6 @@ def get_cnts(image):
         return cnts, areas, max_index
     else:
         return cnts, areas, 0
-
 
 def identify(img):
     img = cv2.resize(img, (200, 200))
@@ -90,7 +89,7 @@ def crop_a4(image, box, A=210, B=297, scale=3, padding=50):
     return cropped
 
 while True:
-    #TODO: стримить сюда фрейм за фреймом с FPGA (или похуй с вебки покажем)
+    #TODO: стримить сюда фрейм за фреймом с FPGA (или похуй с вебки)
     if webcam:
         _, image = cap.read()
     else:
@@ -110,7 +109,6 @@ while True:
         w = dist.euclidean((tl[0], tl[1]), (tr[0], tr[1]))
         h = dist.euclidean((tl[0], tl[1]), (bl[0], bl[1]))
         longest_side = max([w, h])
-
 
     pixel_per_mm=longest_side/a4_h
     cnts, areas, _ = get_cnts(image)
@@ -143,16 +141,14 @@ while True:
         else:
             area_mm2=0
 
-
         #TODO: crop bounding box aroung the image
-        # image = crop_somehow(image)
+        # crop = crop_somehow(image)
 
-        if identify(image):
-            cv2.drawContours(image, cnts[i], -1, (0, 255, 0), 3)
-            cv2.drawContours(image, [box.astype("int")], -1, (0, 0, 255), 2)
-            cv2.putText(image, "{:.1f}mm^2".format(area_mm2),
-                        (int((tl[0] + bl[0] + tr[0] + br[0]) / 4), int((tl[1] + bl[1] + tr[1] + br[1])/4)), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (0, 255, 0), 2)
+        #TODO: if identify(crop): делать то что внизу
+        cv2.drawContours(image, cnts[i], -1, (0, 255, 0), 3)
+        cv2.drawContours(image, [box.astype("int")], -1, (0, 0, 255), 2)
+        cv2.putText(image, "{:.1f}mm^2".format(area_mm2), (int((tl[0] + bl[0] + tr[0] + br[0]) / 4), int((tl[1] + bl[1] + tr[1] + br[1])/4)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     cv2.imshow("image1", image)
     cv2.waitKey(1)
+
