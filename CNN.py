@@ -5,6 +5,18 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import Sequential
 
+
+params = {
+    'lr': 0.01,
+    'convlayers': [16, 32, 64, 64, 64],
+    'fc_layers': [512, 1],
+    'kernel': [(3, 3), (3, 3), (3, 3), (3, 3), (3, 3)],
+    'm_f': 2,
+    'm_s': 2,
+    'activation_hidden': 'relu',
+    'activation_last': 'sigmoid'
+}
+
 class model:
     def __init__(self, lr,  convlayers, fc_layers, kernel, m_f, m_s, activation_hidden, activation_last):
         self.model=self.create_model(lr, convlayers, fc_layers, kernel, m_f, m_s, activation_hidden, activation_last)
